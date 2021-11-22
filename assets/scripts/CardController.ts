@@ -14,7 +14,7 @@ export class CardController extends Component {
         this.selected = false
         this.node.on(Node.EventType.MOUSE_DOWN,()=>{
             let name = this.node.name
-            this.SelectCard(name)
+            this.SwitchCard(name)
         },this)
     }
 
@@ -31,7 +31,7 @@ export class CardController extends Component {
         }
     }
 
-    SelectCard(name:string){
+    SwitchCard(name:string){
         if(name == 'card0'||name=='card1'||name=='card2'||name=='card3'){
             if(!this.selected){
                 this.node.translate(new Vec3(0,-30,0))
@@ -45,6 +45,15 @@ export class CardController extends Component {
     
     public IsSelected():boolean{
         return this.selected
+    }
+
+    RestoreCard(name:string){
+        if(name == 'card0'||name=='card1'||name=='card2'||name=='card3'){
+            if(this.selected){
+                this.node.translate(new Vec3(0,30,0))
+                this.selected = false
+            }
+        } 
     }
 }
 

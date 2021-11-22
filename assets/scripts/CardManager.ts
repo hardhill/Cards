@@ -1,6 +1,6 @@
 
 import {Card, Cards} from './Cards'
-import { _decorator, Component, Scheduler, log } from 'cc';
+import { _decorator, Component, Scheduler, log, director, Button, Label } from 'cc';
 import { CardController } from './CardController';
 const { ccclass, property } = _decorator;
 
@@ -12,7 +12,9 @@ export class CardManager extends Component {
     private coloda:Cards
     private hideCards:Array<Card>
     private gameCards:Array<Card>
-    
+    @property({type:Label})   
+    public scoreText:Label
+    private totalScore:number
     start () {
         this.coloda = new Cards()
         this.hideCards = new Array<Card>()
@@ -47,6 +49,8 @@ export class CardManager extends Component {
                 childnode.getComponent(CardController).SetCard(card,true)
             }
         }, 3)
+        this.scoreText.string = '0'
+        this.totalScore = 0
     }
     GoStage(){
         let errors = 0
@@ -67,6 +71,7 @@ export class CardManager extends Component {
                     // отметить элементы на удаление
                     killCard = killCard.concat(this.hideCards.filter(crd=>crd.name===sel_card_name))
                 }else{
+                    //
                     sel_error++
                     // не убирать из скрытых карту
                 }
@@ -80,7 +85,17 @@ export class CardManager extends Component {
                 }
             }
         }
-        
+        // вернуть все открытые карты на место
+        for(let i=0;i<this.gameCards.length;i++){
+            let card = this.gameCards[i]
+            let childnode = this.node.getChildByName('card'+i.toString())
+            childnode.getComponent(CardController).RestoreCard('card'+i.toString())
+        }
+        // заблокировать кнопку GO
+        const button = director.getScene().getChildByPath('Canvas/bSet')
+        button.getComponent(Button).enabled = false
+
+
         // удалить битые карты в скрытых
         for(let k=0;k<killCard.length;k++){
             let idx = this.hideCards.indexOf(killCard[k])
@@ -94,11 +109,12 @@ export class CardManager extends Component {
         let n = 4-n_ostatok
         for(let i=0; i<4;i++){
             let childnode = this.node.getChildByName('ucard'+i.toString())
-            if(i>n_ostatok-1){
+            if(i> n_ostatok - 1){
                 let card = this.coloda.PullRandomCard()
                 if(typeof(card)!='undefined'){
                     this.hideCards.push(card)
                     childnode.getComponent(CardController).SetCard(card,true)
+                    // скрыть карту через 3 сек
                     this.scheduleOnce(()=>{
                         childnode.getComponent(CardController).SetCard(card,false)
                     },3)
@@ -110,11 +126,29 @@ export class CardManager extends Component {
             }
         }
 
+        // раздать новые открытые карты 
+        for(let n=0;n<4;n++){
+            let newcard = this.coloda.PullRandomCard()
+            if(typeof(newcard)!='undefined'){
+                this.gameCards[n] = newcard
+                let childnode = this.node.getChildByName('card'+n.toString())
+                childnode.getComponent(CardController).SetCard(newcard,true)
+            }else{
+                log('======== GAME IS OVER ==============')
+                break
+            }
+        }
+        // подсчет очков
+        this.totalScore = this.totalScore + success-(errors+sel_error)
+        this.scoreText.string = this.totalScore.toString()
+        log('В колоде осталось:',this.coloda.GetCardsVol())
         log('----------------------------')
         log('Правильно отмеченных',success)
         log('Неправильно отмеченных',sel_error)
         log('Недоотмеченных',errors)
         log('Hide card now:', this.hideCards[0].name,this.hideCards[1].name,this.hideCards[2].name,this.hideCards[3].name)
+        // разблокировать кнопку GO
+        button.getComponent(Button).enabled = true
     }
 
     private CheckedCard(cardname:string):boolean{

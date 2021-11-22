@@ -433,6 +433,9 @@ export class Cards{
         }
         
     }
+    GetCardsVol(){
+        return this.cards.length
+    }
 }
 export type Card = {
     id:string,
