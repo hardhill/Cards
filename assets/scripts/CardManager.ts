@@ -1,6 +1,6 @@
 
 import {Card, Cards} from './Cards'
-import { _decorator, Component, Scheduler, log, director, Button, Label } from 'cc';
+import { _decorator, Component, log, director, Label } from 'cc';
 import { CardController } from './CardController';
 const { ccclass, property } = _decorator;
 
@@ -12,22 +12,51 @@ export class CardManager extends Component {
     private coloda:Cards
     private hideCards:Array<Card>
     private gameCards:Array<Card>
+    
     @property({type:Label})   
     public scoreText:Label
-    private totalScore:number
-    start () {
-        this.coloda = new Cards()
-        this.hideCards = new Array<Card>()
-        this.gameCards = new Array<Card>()
-        
-        this.Startgame()
-        
-    }
+    @property({type:Component})
+    public GameOverScreen:Component
+    @property({type:Component})
+    public GameStartScreen:Component
+    @property({type:Component})
+    public GoButton:Component
 
+    private totalScore:number
+    private gameState:GameState
+
+    start () {
+        this.gameState = GameState.GS_INIT
+    }
+    update(dt:number){
+        switch(this.gameState){
+            case GameState.GS_PLAYING:
+                this.GameOverScreen.node.active = false
+                this.GameStartScreen.node.active = false
+                
+                break
+            case GameState.GS_END:
+                this.GameOverScreen.node.active = true
+                this.GameStartScreen.node.active = false
+                this.GoButton.node.active = false
+                break
+            case GameState.GS_INIT:
+                this.GameOverScreen.node.active = false
+                this.GameStartScreen.node.active = true
+                this.GoButton.node.active = false
+                break    
+        }
+    }
     
     Startgame(){
-        this.coloda.NewPackCards()
+        this.gameState = GameState.GS_PLAYING
+        this.coloda = new Cards()
+        let ncards = this.coloda.NewPackCards()
+        this.hideCards = new Array<Card>()
+        this.gameCards = new Array<Card>()
         this.coloda.Shuffle();
+        this.scoreText.string = '0'
+        this.totalScore = 0
         for(let i=0;i<4;i++){
             //раздать карты скрытые
             let card = this.coloda.PullRandomCard()
@@ -48,15 +77,19 @@ export class CardManager extends Component {
                 let childnode = this.node.getChildByName('card'+i.toString())
                 childnode.getComponent(CardController).SetCard(card,true)
             }
+            // вернуть кнопку
+            this.GoButton.node.active = true
         }, 3)
-        this.scoreText.string = '0'
-        this.totalScore = 0
+        
+        
     }
     GoStage(){
         let errors = 0
         let success = 0
         let sel_error = 0
-        log('Hide card before:', this.hideCards[0].name,this.hideCards[1].name,this.hideCards[2].name,this.hideCards[3].name)
+        // отключаем кнопку
+        this.GoButton.node.active = false
+        this.scheduleOnce(()=>{this.GoButton.node.active = true},3)
         // работаем с открытыми картами
         // формируем массив в который добавляются карты для удаления
         let killCard:Array<Card> = new Array<Card>()
@@ -91,9 +124,7 @@ export class CardManager extends Component {
             let childnode = this.node.getChildByName('card'+i.toString())
             childnode.getComponent(CardController).RestoreCard('card'+i.toString())
         }
-        // заблокировать кнопку GO
-        const button = director.getScene().getChildByPath('Canvas/bSet')
-        button.getComponent(Button).enabled = false
+        
 
 
         // удалить битые карты в скрытых
@@ -117,6 +148,7 @@ export class CardManager extends Component {
                     // скрыть карту через 3 сек
                     this.scheduleOnce(()=>{
                         childnode.getComponent(CardController).SetCard(card,false)
+                        
                     },3)
                 }    
                 
@@ -125,30 +157,33 @@ export class CardManager extends Component {
                 childnode.getComponent(CardController).SetCard(card,false)
             }
         }
-
+        
         // раздать новые открытые карты 
-        for(let n=0;n<4;n++){
-            let newcard = this.coloda.PullRandomCard()
-            if(typeof(newcard)!='undefined'){
-                this.gameCards[n] = newcard
-                let childnode = this.node.getChildByName('card'+n.toString())
-                childnode.getComponent(CardController).SetCard(newcard,true)
-            }else{
-                log('======== GAME IS OVER ==============')
-                break
+        if(this.coloda.GetCardsVol()>4){
+            for(let n=0;n<4;n++){
+                let newcard = this.coloda.PullRandomCard()
+                if(typeof(newcard)!='undefined'){
+                    this.gameCards[n] = newcard
+                    let childnode = this.node.getChildByName('card'+n.toString())
+                    childnode.getComponent(CardController).SetCard(newcard,true)
+                }else{
+                    
+                    break
+                }
             }
+        }else{
+            this.gameState = GameState.GS_END
         }
         // подсчет очков
         this.totalScore = this.totalScore + success-(errors+sel_error)
         this.scoreText.string = this.totalScore.toString()
         log('В колоде осталось:',this.coloda.GetCardsVol())
         log('----------------------------')
-        log('Правильно отмеченных',success)
-        log('Неправильно отмеченных',sel_error)
-        log('Недоотмеченных',errors)
-        log('Hide card now:', this.hideCards[0].name,this.hideCards[1].name,this.hideCards[2].name,this.hideCards[3].name)
-        // разблокировать кнопку GO
-        button.getComponent(Button).enabled = true
+        
+    }
+    RestartGame(){
+        this.Startgame()
+       // director.loadScene('Main')
     }
 
     private CheckedCard(cardname:string):boolean{
@@ -162,6 +197,12 @@ export class CardManager extends Component {
     }
 
 }
+
+enum GameState{
+    GS_INIT,
+    GS_PLAYING,
+    GS_END,
+  }
 
 
 
